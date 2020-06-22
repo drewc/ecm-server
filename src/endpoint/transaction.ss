@@ -39,14 +39,18 @@
 (def (insert-transaction tr)
   (with-request-user-db ()
     (query return: 'single
-           "SELECT jso.insert_transaction($1)" tr)))
+           "SELECT jso.insert_transaction($1)" tr
+
+         ;  "SELECT json_build_object('u', CURRENT_USER)"
+
+           )))
 
 (def (transaction-create/POST)
   (with-request-user ()
    (try
-    (let* ((req-tranny (http-request-body*))
+    (let* ((req-tranny (bytes->string (http-request-body*)))
            (new-tranny (insert-transaction req-tranny)))
-      (respond/json tr))
+      (respond/json new-tranny))
     (catch (e)
       (respond/json
        (json-object->string
