@@ -1,0 +1,28 @@
+#+TITLE: Configuration
+
+The ECM things need config. To keep it simple for now, the config is stored in
+*~/.ecm/ecm.conf*, and is gerbil syntax.
+
+#+begin_src gerbil :tangle "../src/conf.ss"
+  (export #t)
+
+  (def conf-file-path "~/.ecm/ecm.conf")
+
+  (def (read-conf-file (path conf-file-path))
+    (with-input-from-file path read))
+
+  (def conf #f)
+
+  (def (conf-value key . keys)
+    (def (cv c key . keys)
+      (let (v (pgetq key c))
+        (if (null? keys) v (if v (apply cv v keys) v))))
+
+    (unless conf (set! conf (read-conf-file)))
+    (apply cv conf key keys))
+#+end_src
+
+
+#+begin_src gerbil :tangle "../default-conf.sexp"
+(database: (master: (db: "maxclaims" user: "ecm" host: "localhost" port: 5434))) 
+#+end_src

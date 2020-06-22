@@ -1,0 +1,32 @@
+#+TITLE: Sessions: per login values
+#+OPTIONS:  ^:nil 
+
+KISS means that I'm not sure what the application GUI needs for sessions, but
+PostgreSQL offers a great JSONB type that lets us pick and choose.
+
+* /Endpoint/ ~/json/session~
+
+The *JSON Server Interface* has a function to return a session. There's a cookie
+that tells us what the login id is called ~ecm-login~.
+
+
+#+begin_src gerbil :tangle "../src/endpoint/session.ss"
+  (import :drewc/ftw :ecm/server/postgresql :std/db/dbi :ecm/server/request-user)
+
+  (define-endpoint session "^/json/session$")
+
+  (def (session/GET (s "{}"))
+    (let (o (assget "Origin" (http-request-headers*)))
+      (with-request-user ()
+        (let (sess s #;(query return: 'single
+                          (string-append
+                           "SELECT jsi.login_session('"
+                           (symbol->string (current-ecm-login)) "');")))
+          (http-response-write* 200 `(("Content-Type" . "application/json")
+                                      ("Access-Control-Allow-Origin" . ,(or o "*"))
+                                      ("Access-Control-Allow-Credentials" . "true"))
+                                sess)))))
+#+end_src
+
+
+

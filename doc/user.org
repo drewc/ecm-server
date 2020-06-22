@@ -1,0 +1,86 @@
+
+#+begin_src gerbil :tangle "../src/endpoint/user.ss"
+  (import :drewc/ftw :ecm/server/postgresql :std/db/dbi :ecm/server/request-user
+          :std/text/utf8 :std/text/json)
+
+
+  (def (/OPTIONS)
+    (let (o (assget "Origin" (http-request-headers*)))
+      (http-response-write*
+       200 `(("Access-Control-Allow-Origin" . ,(or o "*"))
+             ("Access-Control-Allow-Credentials" . "true")
+             ("Access-Control-Allow-Methods" . "POST, GET, OPTIONS") 
+             ("Access-Control-Allow-Headers" . "Content-Type"))
+       #f)))
+
+  (def (respond/json json)
+    (let ((o (assget "Origin" (http-request-headers*))))
+      (http-response-write* 200 `(("Content-Type" . "application/json")
+                                  ("Access-Control-Allow-Origin" . ,(or o "*"))
+                                  ("Access-Control-Allow-Credentials" . "true"))
+                            json)))
+  ;; * Individual users
+
+  (define-endpoint user "^/json/user$")
+  (def user/OPTIONS /OPTIONS)
+
+  (def (user/GET)
+    (let ((ps (with-ecm-sql () (users-query)))
+          (o (assget "Origin" (http-request-headers*))))
+          (http-response-write* 200 `(("Content-Type" . "application/json")
+                                      ("Access-Control-Allow-Origin" . ,(or o "*"))
+                                      ("Access-Control-Allow-Credentials" . "true"))
+                                ps)))
+
+  (def (user/POST)
+    (let* ((data (with-input-from-u8vector (http-request-body*) read-json))
+           (user (hash-get data 'u))
+           (o (assget "Origin" (http-request-headers*)))
+           (pw (hash-get data 'p))
+           (string-obj (with-ecm-sql () (query return: 'single
+                                        "SELECT json_agg(to_json(foo)) FROM \"user\"..\"user\" foo")))
+           (restr (or string-obj (with-output-to-string
+                          "" (cut write-json
+                               (list->hash-table
+                                '((error . "Invalid Username and/or Password)"))))))))
+
+    (http-response-write* 200 `(("Content-Type" . "application/json")
+                                ("Access-Control-Allow-Origin" . ,(or o "*"))
+                                ("Access-Control-Allow-Credentials" . "true"))
+                          "")))
+
+
+  ;; * All Users
+
+  (define-endpoint users "^/json/users$")
+  (def users/OPTIONS /OPTIONS)
+
+  (def (users-query)
+    (query return: 'single
+           "SELECT json_agg(to_json(foo))
+  FROM (
+    SELECT *
+    , jsi.corpus_summary(person_id) AS corpus
+    , CASE WHEN (g.group_id IS NOT NULL) THEN TRUE ELSE FALSE END AS group
+     , (SELECT array_agg(m.group_id) FROM \"user\".group AS m WHERE u.user_id = ANY (m.members))
+       AS group_membership
+
+  FROM \"user\".\"user\" u
+  LEFT JOIN \"user\".group g ON (user_id = group_ID)
+
+   ) foo
+
+  "))
+
+  (def (users/GET)
+    (let ((ps (with-ecm-sql () (users-query)))
+          (o (assget "Origin" (http-request-headers*))))
+          (http-response-write* 200 `(("Content-Type" . "application/json")
+                                      ("Access-Control-Allow-Origin" . ,(or o "*"))
+                                      ("Access-Control-Allow-Credentials" . "true"))
+                                ps)))
+
+
+
+
+#+end_src

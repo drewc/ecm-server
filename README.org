@@ -1,0 +1,40 @@
+ECM Server: The goto place for blame
+
+
+#+begin_src gerbil :tangle start-server.ss
+  (import :ecm/server/web-server
+          :ecm/server/json-server
+          :std/logger)
+
+  (set! std/logger#current-logger (make-parameter #f))
+  (def error-log (open-output-string))
+
+  (start-logger! error-log)
+
+  (start-ecm-server!)
+  (get-output-string error-log)
+#+end_src
+
+
+* Emacs Indentation and Highlighting 
+
+#+begin_src emacs-lisp
+  (defun ecm-gerbil-syntax ()
+    (interactive)
+
+    ;; (gerbil-put-indent '(.begin .or .any) 0) 
+    (gerbil-put-indent '(with-request-user with-ecm-db with-request-user-db)  1)
+
+    (gerbil-fontlock-add
+     (cons
+      (concat
+       "(" (regexp-opt '("with-request-user" "with-request-user-db" "with-ecm-db")
+                       t)
+       "\\>")
+      '(1 'font-lock-keyword-face  ))))
+
+  (add-hook 'gerbil-mode-hook 'ecm-gerbil-syntax)
+#+end_src
+
+#+RESULTS:
+| ecm-gerbil-syntax | gerbil:drewc/gmime-foreign | gerbil:/std/test-syntax | slime-mode |

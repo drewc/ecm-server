@@ -1,0 +1,68 @@
+#+TITLE: Messages and archives
+
+A lot of the uploaded attachment are ~.msg~ files which is a message from
+outlook.
+
+We actually want to display it per claim as a mailing list archive so the
+examiner can easily view it.
+
+
+* ~MSGConvert~: A .MSG to rfc2882 or mbox converter
+  
+"I wrote this to be able to convert some .MSG files I had lying around."
+ --https://www.matijs.net/software/msgconv/
+
+** Installation
+
+#+begin_src shell
+cd ~/src/
+git clone https://github.com/mvz/email-outlook-message-perl.git
+cd email-outlook-message-perl
+cpan CPAN; cpan Build;
+perl Build.PL 
+./Build installdeps
+./Build 
+./Build test
+sudo ./Build install
+#+end_src
+
+
+* ~maildrop~: ~reformail~ et al.
+
+#+begin_src shell
+sudo apt-get install maildrop
+
+#+end_src
+
+
+#+begin_src shell
+  function foo {
+      IDCACHE=$(mktemp -p /tmp)
+      reformail -D $((1024*1024*10)) ${IDCACHE} -s echo
+      rm ${IDCACHE}
+  } 
+#+end_src
+
+#+begin_src shell :shebang #!/bin/sh :tangle dedup.sh
+# stdin: a email
+TM=tmpmail
+if [ -f $TM ] ; then
+   echo error!
+   exit 1
+fi
+cat > $TM
+# mbox format, each mail end with a blank line
+echo "" >> $TM
+
+cat $TM | reformail -D 99999999 idcache
+
+# if this mail isn't a dup (reformail return 1 if message-id is not found)
+if [ $? != 0 ]; then
+   # each mail shall have a message-id
+   if grep -q -i '^message-id:' $TM; then
+      cat tmpmail >> nmbox
+   fi
+fi
+
+rm $TM
+#+end_src

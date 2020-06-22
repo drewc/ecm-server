@@ -1,0 +1,44 @@
+This is how to hack and install and run the ECM server.
+
+* Nix
+
+
+** Installation
+
+ We install *Nix* as a daemon.
+
+ #+begin_src shell
+   curl -L https://nixos.org/nix/install | sh
+ #+end_src
+
+ Instructions for doing so can be found here: https://nixos.org/nix/download.html
+
+
+** Nixpkgs fork
+
+ We need our own versions of certain packages.
+
+ #+begin_src shell 
+ sudo sh -c '
+ cd /opt/
+ git clone --depth 1 https://github.com/fare-patches/nixpkgs.git
+ chown -R $USER.$USER nixpkgs';
+ #+end_src
+
+
+** Install Our gerbil
+
+ #+begin_src shell
+ . '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
+ export NIX_PATH="nixpkgs=/opt/nixpkgs:$NIX_PATH"
+ nix-env -f '<nixpkgs>' -iA gerbil-unstable
+ #+end_src
+
+** ~${GERBIL_HOME}~
+
+ #+begin_src shell :tangle gerbil-nix-env.sh
+ # . '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
+ export NIX_PATH="nixpkgs=/opt/nixpkgs:$NIX_PATH"
+ export GERBIL_HOME=$(dirname "$(dirname "$(realpath "$(which gxc)")")")
+ #+end_src
+

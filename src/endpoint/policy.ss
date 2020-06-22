@@ -1,0 +1,32 @@
+(import :drewc/ftw :ecm/server/postgresql :std/db/dbi :ecm/server/request-user
+        :std/text/utf8 :std/text/json)
+
+
+(def (/OPTIONS)
+  (let (o (assget "Origin" (http-request-headers*)))
+    (http-response-write*
+     200 `(("Access-Control-Allow-Origin" . ,(or o "*"))
+           ("Access-Control-Allow-Credentials" . "true")
+           ("Access-Control-Allow-Methods" . "POST, GET, OPTIONS") 
+           ("Access-Control-Allow-Headers" . "Content-Type"))
+     #f)))
+
+(def (respond/json json)
+  (let ((o (assget "Origin" (http-request-headers*))))
+    (http-response-write* 200 `(("Content-Type" . "application/json")
+                                ("Access-Control-Allow-Origin" . ,(or o "*"))
+                                ("Access-Control-Allow-Credentials" . "true"))
+                          json)))
+
+(define-endpoint policy "^/json/policy$")
+(def policy/OPTIONS /OPTIONS)
+
+(def (policy-crux-query id)
+  (query return: 'single
+         "SELECT jso.policy($1::int)" id))
+
+(def (policy/GET)
+  (let* ((id (string->number (GET-parameter* "id")))
+         (crux (with-ecm-sql () (policy-crux-query id))))
+    ;; (error (GET-parameters*))
+    (respond/json crux)))

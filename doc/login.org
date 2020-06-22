@@ -1,0 +1,118 @@
+#+TITLE: Login a user
+
+* /endpoint/ ~/json/login~
+
+#+begin_src gerbil :tangle "../src/endpoint/login.ss"
+  (import :drewc/ftw :ecm/server/postgresql :std/db/dbi :ecm/server/request-user
+          :std/text/utf8 :std/text/json)
+
+  (define-endpoint login "^/json/login$")
+
+  (def (login/GET)
+    (let ((ps (GET-parameters*))
+          (o (assget "Origin" (http-request-headers*))))
+          (http-response-write* 200 `(("Content-Type" . "application/json")
+                                      ("Access-Control-Allow-Origin" . ,(or o "*"))
+                                      ("Access-Control-Allow-Credentials" . "true"))
+                                (with-output-to-string "" (cut write ps)))))
+
+  (def (login/OPTIONS)
+   (let (o (assget "Origin" (http-request-headers*)))
+     (http-response-write*
+      200 `(("Access-Control-Allow-Origin" . ,(or o "*"))
+            ("Access-Control-Allow-Credentials" . "true")
+            ("Access-Control-Allow-Methods" . "POST, GET, OPTIONS") 
+            ("Access-Control-Allow-Headers" . "Content-Type"))
+      #f)))
+
+  (def (login/POST)
+    (let* ((data (with-input-from-u8vector (http-request-body*) read-json))
+           (user (hash-get data 'u))
+           (o (assget "Origin" (http-request-headers*)))
+           (pw (hash-get data 'p))
+           (string-obj (with-ecm-sql () (query return: 'single
+                                        "SELECT login.login_user($1, $2)"
+                                        user pw)))
+           (restr (or string-obj (with-output-to-string
+                          "" (cut write-json
+                               (list->hash-table
+                                '((error . "Invalid Username and/or Password)"))))))))
+    (http-response-write* 200 `(("Content-Type" . "application/json")
+                                ("Access-Control-Allow-Origin" . ,(or o "*"))
+                                ("Access-Control-Allow-Credentials" . "true"))
+                          restr)))
+
+
+#+end_src
+
+* /File/ ~request-user~
+
+When a user is logged in, they are given a cookie. If that cookie's in the
+database as an active user, that user is active.
+
+Rather than have every single request also have to hit the database before
+anything else, we cache the ~active-users~ in the web server process.
+
+What we cache 
+
+#+BEGIN_SRC gerbil :tangle "../src/request-user.ss"
+  (import :drewc/ftw :ecm/server/postgresql :std/db/dbi  :std/db/conpool
+          :std/srfi/19 :std/text/json :std/ref :std/sugar)
+  (export #t)
+
+  (defstruct request-user (session))
+  (def current-request-user (make-parameter #f))
+  (def current-ecm-login (make-parameter #f))
+
+                   
+  (def active-request-users (make-hash-table-eq))
+
+  (def (call-with-request-user-db user fn)
+    (with-ecm-sql (c)
+      (try
+       (let (role (ref (request-user-session user)
+                       'request_user_record 'db_role))
+         (query "RESET SESSION AUTHORIZATION")
+         (query (with-output-to-string "SET SESSION AUTHORIZATION " (cut write role)))
+         (error "here!"))
+      (finally (query "RESET SESSION AUTHORIZATION")))))
+
+  (def (call-with-request-user
+        fn otherwise: (otherwise 
+                       (lambda (req)
+                         (let (o (assget "Origin" (http-request-headers req)))
+                            (http-response-write* 401
+                            `(("Content-Type" . "text/plain")
+                              ("Access-Control-Allow-Origin" . ,(or o "*"))
+                              ("Access-Control-Allow-Credentials" . "true"))
+                            "No Valid Request User")))))
+    (let* ((id (assget "ecm-login" (http-request-cookies*)))
+           (id (and id (string->symbol id)))
+           (ru (and id (hash-get active-request-users id)))
+           (call/ru (lambda (ru)
+                      (parameterize ((current-request-user ru)
+                                     (current-ecm-login id))
+                        (fn ru)))))
+    
+      (cond ((not id) (otherwise (current-http-request)))
+            ((not ru) 
+             (let* (sess
+                    (with-ecm-sql ()
+                      (query return: 'json
+                             (string-append "SELECT jsi.login_session('"
+                                            (symbol->string id) "');"))))
+               (if (not sess) (otherwise (current-http-request))
+                   (let (ru (request-user sess))
+                     (set! (ref active-request-users id) ru)
+                     (call/ru ru)))))
+            (#t (call/ru ru)))))
+
+
+  (defrules with-request-user ()
+    ((_ () body ...)
+     (call-with-request-user (lambda (_) body ...)))
+    ((_ (user) body ...)
+     (call-with-request-user (lambda (user) body ...))))
+#+END_SRC
+
+
