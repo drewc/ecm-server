@@ -4,11 +4,11 @@
 (import :std/build-script)
 
 (defbuild-script
-  '("src/conf" "src/postgresql" "src/web-server" "src/request-user"
-    "src/endpoint/login" "src/endpoint/session" "src/endpoint/user"
-    "src/endpoint/claim" "src/endpoint/policy" "src/endpoint/person"
-    "src/endpoint/transaction"
-    "src/json-server"
+  '("server/conf" "server/postgresql" "server/web-server" "server/request-user"
+    "server/endpoint/login" "server/endpoint/session" "server/endpoint/user"
+    "server/endpoint/claim" "server/endpoint/policy" "server/endpoint/person"
+    "server/endpoint/transaction"
+    "server/json-server"
     ))
 
 

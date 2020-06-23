@@ -1,2 +1,2 @@
-(package: ecm/server
- depend: ("github.com/drewc/ftw" "github.com/drewc/gerbil-postgresql"))
+(package: ecm
+ depend: ("github.com/drewc/gerbil-postgresql" "github.com/drewc/ftw"))
